@@ -51,3 +51,19 @@ test('rejects API paths that escape api.github.com', async () => {
     await rm(dir, { recursive: true, force: true })
   }
 })
+
+test('handles GitHub authorization_pending responses returned with HTTP 200', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'dsh-github-login-'))
+  const tokenPath = join(dir, 'credentials.json')
+  const originalFetch = globalThis.fetch
+  await writeFile(tokenPath, JSON.stringify({ kind: 'device-flow', device_code: 'device', client_id: 'client', interval: 5, expires_at: Date.now() + 60_000 }))
+  globalThis.fetch = async () => response({ error: 'authorization_pending', error_description: 'The user has not yet authorized' })
+  try {
+    const result = await mounted({ tokenPath }).get('github_login_poll').execute({})
+    assert.equal(result.status, 'authorization_pending')
+    assert.equal(result.interval, 5)
+  } finally {
+    globalThis.fetch = originalFetch
+    await rm(dir, { recursive: true, force: true })
+  }
+})

@@ -97,6 +97,10 @@ export function apply(ctx, config = {}) {
         if (code === 'access_denied') { await removeState(tokenPath); throw new Error('GitHub authorization was denied.') }
         throw error
       })
+      if (data?.error === 'authorization_pending') return { status: 'authorization_pending', interval: pending.interval, next_step: 'Wait for the indicated interval, then call github_login_poll again.' }
+      if (data?.error === 'slow_down') { pending.interval = Math.min(60, (Number(pending.interval) || 5) + 5); await saveJson(tokenPath, pending); return { status: 'authorization_pending', interval: pending.interval, next_step: 'Wait for the indicated interval, then call github_login_poll again.' } }
+      if (data?.error === 'expired_token') { await removeState(tokenPath); throw new Error('The GitHub device code expired. Start login again.') }
+      if (data?.error === 'access_denied') { await removeState(tokenPath); throw new Error('GitHub authorization was denied.') }
       if (data.authorization_pending) return { status: 'authorization_pending', interval: data.interval ?? pending.interval, next_step: 'Wait for the indicated interval, then call github_login_poll again.' }
       if (!data?.access_token) throw new Error('GitHub did not return an access token')
       const token = { kind: 'token', access_token: data.access_token, token_type: data.token_type || 'bearer', scope: data.scope || pending.scope, created_at: new Date().toISOString() }
